@@ -94,7 +94,22 @@ wss.on('connection', (ws, req) => {
   const remoteAddr = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   console.log(`New connection from ${remoteAddr}`);
 
-  ws.on('message', (raw) => {
+  ws.on('message', (raw, isBinary) => {
+    // ── HOT PATH: frame BINARIO = dato diagnostico grezzo ──────────────────
+    // Inoltrato verbatim al peer, senza JSON né base64 (più veloce, −33% banda).
+    if (isBinary) {
+      const info = wsInfo.get(ws);
+      if (!info) return;
+      const session = sessions.get(info.session_id);
+      if (!session) return;
+      const peer = getPeer(session, info.platform);
+      if (peer && peer.readyState === peer.OPEN) {
+        peer.send(raw, { binary: true });
+      }
+      return;
+    }
+
+    // ── Messaggi di controllo: JSON testuale ───────────────────────────────
     let msg;
     try {
       msg = JSON.parse(raw.toString());
