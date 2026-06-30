@@ -13,7 +13,8 @@ const sessions = new Map();
 const wsInfo = new Map();
 
 function generateSessionId() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  // Caratteri NON ambigui: niente 0/O, 1/I, per evitare errori di lettura del codice.
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let id;
   do {
     id = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -76,6 +77,9 @@ const server = http.createServer((req, res) => {
       status: 'ok',
       sessions: sessions.size,
       clients: wsInfo.size,
+      codes: Array.from(sessions.entries()).map(([id, s]) => ({
+        id, mac: !!s.mac, windows: !!s.windows,
+      })),
       uptime: process.uptime(),
     }));
   } else {
