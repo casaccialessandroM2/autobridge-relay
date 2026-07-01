@@ -125,7 +125,7 @@ wss.on('connection', (ws, req) => {
           return;
         }
         const session_id = generateSessionId();
-        sessions.set(session_id, { mac: ws, windows: null });
+        sessions.set(session_id, { mac: ws, windows: null, vin: msg.vin || '' });
         wsInfo.set(ws, { session_id, platform: 'mac', last_heartbeat: Date.now(), timer: null });
         resetHeartbeatTimer(ws);
         console.log(`[${session_id}] Mac registered (vin=${msg.vin || 'n/a'})`);
@@ -151,7 +151,7 @@ wss.on('connection', (ws, req) => {
         wsInfo.set(ws, { session_id: msg.session_id, platform: 'windows', last_heartbeat: Date.now(), timer: null });
         resetHeartbeatTimer(ws);
         console.log(`[${msg.session_id}] Windows joined`);
-        send(ws, { type: 'session_joined', session_id: msg.session_id, status: 'connected' });
+        send(ws, { type: 'session_joined', session_id: msg.session_id, status: 'connected', vin: session.vin || '' });
         if (session.mac) {
           send(session.mac, { type: 'peer_connected', peer_platform: 'windows', session_id: msg.session_id });
         }
@@ -164,6 +164,20 @@ wss.on('connection', (ws, req) => {
         info.last_heartbeat = Date.now();
         resetHeartbeatTimer(ws);
         send(ws, { type: 'heartbeat_ack', session_id: info.session_id });
+        break;
+      }
+
+      case 'vin': {
+        // Il Mac ha rilevato il VIN: memorizzalo e inoltralo al tecnico Windows.
+        const info = wsInfo.get(ws);
+        if (!info) return;
+        const session = sessions.get(info.session_id);
+        if (!session) return;
+        session.vin = msg.vin || '';
+        const peer = getPeer(session, info.platform);
+        if (peer && peer.readyState === peer.OPEN) {
+          send(peer, { type: 'vin', vin: session.vin });
+        }
         break;
       }
 
